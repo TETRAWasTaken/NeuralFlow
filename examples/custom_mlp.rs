@@ -3,13 +3,15 @@ use NeuralFlow::prelude::*;
 pub struct MyCustomModel {
     fc1: Linear,
     fc2: Linear,
+    fc3: Linear,
 }
 
 impl MyCustomModel {
     pub fn new() -> Self {
         Self {
             fc1: Linear::new(2, 4),
-            fc2: Linear::new(4, 1),
+            fc2: Linear::new(4, 4),
+            fc3: Linear::new(4, 1),
         }
     }
 }
@@ -17,12 +19,14 @@ impl MyCustomModel {
 impl Module for MyCustomModel {
     fn forward(&self, x: &Tensor) -> Tensor {
         let h = self.fc1.forward(x).relu();
-        self.fc2.forward(&h)
+        let h2 = self.fc2.forward(&h).relu();
+        self.fc3.forward(&h2)
     }
 
     fn parameters(&self) -> Vec<Tensor> {
         let mut params = self.fc1.parameters();
         params.extend(self.fc2.parameters());
+        params.extend(self.fc3.parameters());
         params
     }
 }
