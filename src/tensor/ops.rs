@@ -83,4 +83,74 @@ impl Tensor {
 
         out
     }
+
+    pub fn sigmoid(&self) -> Tensor {
+        let inner = self.0.borrow();
+        let out_data: Vec<f32> = inner.data.iter().map(|&x| 1.0 / (1.0 + (-x)   .exp())).collect();
+        let out = Tensor::new(out_data, inner.shape);
+        out.0.borrow_mut().prev = vec![self.clone()];
+
+        let self_clone = self.clone();
+        let out_clone = out.clone();
+
+        out.0.borrow_mut().backward = Some(Box::new(move || {
+            let out_grad = out_clone.0.borrow().grad.clone();
+            let self_data = self_clone.0.borrow().data.clone();
+            let mut self_inner = self_clone.0.borrow_mut();
+            for i in 0..self_data.len() {
+                self_inner.grad[i] += out_grad[i] * (self_data[i] * (1.0 - self_data[i]));
+            }
+        }));
+        out
+    }
+
+    pub fn tanh(&self) -> Tensor {
+        let inner = self.0.borrow();
+        let out_data: Vec<f32> = inner.data.iter().map(|&x| x.tanh()).collect();
+        let out = Tensor::new(out_data, inner.shape);
+        out.0.borrow_mut().prev = vec![self.clone()];
+
+        let self_clone = self.clone();
+        let out_clone = out.clone();
+
+        out.0.borrow_mut().backward = Some(Box::new(move || {
+            let out_grad = out_clone.0.borrow().grad.clone();
+            let out_data = out_clone.0.borrow().data.clone();
+            let mut self_inner = self_clone.0.borrow_mut();
+            
+            for i in 0..out_data.len() {
+                let t = out_data[i];
+                self_inner.grad[i] += out_grad[i] * (1.0 - t * t);
+            }
+        }));
+        
+        out
+    }
+
+    pub fn leaky_relu(&self, alpha: f32) -> Tensor {
+        let inner = self.0.borrow();
+        let out_data: Vec<f32> = inner
+            .data
+            .iter()
+            .map(|&x| if x > 0.0 { x } else { alpha * x })
+            .collect();
+        let out = Tensor::new(out_data, inner.shape);
+        out.0.borrow_mut().prev = vec![self.clone()];
+
+        let self_clone = self.clone();
+        let out_clone = out.clone();
+
+        out.0.borrow_mut().backward = Some(Box::new(move || {
+            let out_grad = out_clone.0.borrow().grad.clone();
+            let inp_data = self_clone.0.borrow().data.clone();
+            let mut self_inner = self_clone.0.borrow_mut();
+
+            for i in 0..self_inner.data.len() {
+                let scale = if inp_data[i] > 0.0 { 1.0 } else { alpha };
+                self_inner.grad[i] += out_grad[i] * scale;
+            }
+        }));
+        
+        out
+    }
 }

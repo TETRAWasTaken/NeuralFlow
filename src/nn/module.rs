@@ -9,4 +9,14 @@ pub trait Module {
             p.zero_grad();
         }
     }
+
+    fn set_training(&self, _mode: bool) {}
+
+    fn train(&self) {
+        self.set_training(true);
+    }
+
+    fn eval(&self) {
+        self.set_training(false);
+    }
 }
