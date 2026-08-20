@@ -29,6 +29,7 @@ impl Evaluator {
         loader: &mut Dataloader<D>,
         loss_fn: fn(&Tensor, &Tensor) -> Tensor,
     ) -> EvaluationReport {
+        let _guard = crate::tensor::no_grad();
         model.eval();
 
         let mut total_loss = 0.0;

@@ -22,9 +22,12 @@ impl LayerNorm {
 impl Module for LayerNorm {
     fn forward(&self, input: &Tensor) -> Tensor {
         let (b, d) = input.0.borrow().shape;
-        let x = input.0.borrow().data.clone();
-        let gamma_data = self.gamma.0.borrow().data.clone();
-        let beta_data = self.beta.0.borrow().data.clone();
+        let inp_inner = input.0.borrow();
+        let gamma_inner = self.gamma.0.borrow();
+        let beta_inner = self.beta.0.borrow();
+        let x = &inp_inner.data;
+        let gamma_data = &gamma_inner.data;
+        let beta_data = &beta_inner.data;
 
         let mut out_data = vec![0.0; b * d];
         let mut x_hat = vec![0.0; b * d];
@@ -44,51 +47,61 @@ impl Module for LayerNorm {
                 out_data[idx] = x_hat_val * gamma_data[j] + beta_data[j];
             }
         }
+        drop(inp_inner);
+        drop(gamma_inner);
+        drop(beta_inner);
 
         let out = Tensor::new(out_data, (b, d));
-        out.0.borrow_mut().prev = vec![input.clone(), self.gamma.clone(), self.beta.clone()];
 
-        let input_clone = input.clone();
-        let gamma_clone = self.gamma.clone();
-        let beta_clone = self.beta.clone();
-        let out_clone = out.clone();
+        if crate::tensor::is_grad_enabled() {
+            out.0.borrow_mut().prev = vec![input.clone(), self.gamma.clone(), self.beta.clone()];
 
-        out.0.borrow_mut().backward = Some(Box::new(move || {
-            let out_grad = out_clone.0.borrow().grad.clone();
-            let g_data = gamma_clone.0.borrow().data.clone();
+            let input_clone = input.clone();
+            let gamma_clone = self.gamma.clone();
+            let beta_clone = self.beta.clone();
+            let out_clone = out.clone();
 
-            let mut inp_grad = input_clone.0.borrow_mut();
-            let mut gamma_grad = gamma_clone.0.borrow_mut();
-            let mut beta_grad = beta_clone.0.borrow_mut();
+            out.0.borrow_mut().backward = Some(Box::new(move || {
+                let out_inner = out_clone.0.borrow();
+                let out_grad = &out_inner.grad;
 
-            for i in 0..b {
-                let row_start = i * d;
-                let istd = inv_std[i];
-                let mut sum_dout_gamma = 0.0;
-                let mut sum_dout_gamma_xhat = 0.0;
+                let mut inp_inner = input_clone.0.borrow_mut();
+                let mut gamma_inner = gamma_clone.0.borrow_mut();
+                let mut beta_inner = beta_clone.0.borrow_mut();
 
-                for j in 0..d {
-                    let idx = row_start + j;
-                    let dout = out_grad[idx];
-                    let xh = x_hat[idx];
-                    gamma_grad.grad[j] += dout * xh;
-                    beta_grad.grad[j] += dout;
+                let crate::tensor::inner::TensorInner { data: g_data, grad: gamma_grad, .. } = &mut *gamma_inner;
+                let beta_grad = &mut beta_inner.grad;
+                let inp_grad = &mut inp_inner.grad;
 
-                    let dout_gamma = dout * g_data[j];
-                    sum_dout_gamma += dout_gamma;
-                    sum_dout_gamma_xhat += dout_gamma * xh;
+                for i in 0..b {
+                    let row_start = i * d;
+                    let istd = inv_std[i];
+                    let mut sum_dout_gamma = 0.0;
+                    let mut sum_dout_gamma_xhat = 0.0;
+
+                    for j in 0..d {
+                        let idx = row_start + j;
+                        let dout = out_grad[idx];
+                        let xh = x_hat[idx];
+                        gamma_grad[j] += dout * xh;
+                        beta_grad[j] += dout;
+
+                        let dout_gamma = dout * g_data[j];
+                        sum_dout_gamma += dout_gamma;
+                        sum_dout_gamma_xhat += dout_gamma * xh;
+                    }
+
+                    for j in 0..d {
+                        let idx = row_start + j;
+                        let dout_gamma = out_grad[idx] * g_data[j];
+                        let xh = x_hat[idx];
+                        let dx = (istd / d as f32)
+                            * (d as f32 * dout_gamma - sum_dout_gamma - xh * sum_dout_gamma_xhat);
+                        inp_grad[idx] += dx;
+                    }
                 }
-
-                for j in 0..d {
-                    let idx = row_start + j;
-                    let dout_gamma = out_grad[idx] * g_data[j];
-                    let xh = x_hat[idx];
-                    let dx = (istd / d as f32)
-                        * (d as f32 * dout_gamma - sum_dout_gamma - xh * sum_dout_gamma_xhat);
-                    inp_grad.grad[idx] += dx;
-                }
-            }
-        }));
+            }));
+        }
 
         out
     }

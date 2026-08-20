@@ -177,4 +177,16 @@ impl<'a, D: Dataset> Dataset for TransformedDataset<'a, D> {
         };
         (scaled_x, scaled_y)
     }
+
+    fn get_into(&self, index: usize, x_dst: &mut Vec<f32>, y_dst: &mut Vec<f32>) {
+        let (x, y) = self.dataset.get(index);
+        let scaled_x = self.scaler.transform_sample(&x);
+        x_dst.extend_from_slice(&scaled_x);
+        if let Some(ts) = self.target_scaler {
+            let scaled_y = ts.transform_sample(&y);
+            y_dst.extend_from_slice(&scaled_y);
+        } else {
+            y_dst.extend_from_slice(&y);
+        }
+    }
 }

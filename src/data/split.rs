@@ -26,6 +26,11 @@ impl<'a, D: Dataset> Dataset for Subset<'a, D> {
         let original_index = self.indices[index];
         self.dataset.get(original_index)
     }
+
+    fn get_into(&self, index: usize, x_dst: &mut Vec<f32>, y_dst: &mut Vec<f32>) {
+        let original_index = self.indices[index];
+        self.dataset.get_into(original_index, x_dst, y_dst);
+    }
 }
 
 pub fn train_test_split<'a, D: Dataset>(

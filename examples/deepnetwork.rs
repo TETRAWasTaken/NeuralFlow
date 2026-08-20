@@ -106,6 +106,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut best_saver = BestModelSaver::new(checkpoint_path);
 
     println!("\n--- Starting Training ---");
+    let start_time = std::time::Instant::now();
 
     for epoch in 1..=epochs {
         model.train();
@@ -149,6 +150,9 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
             epoch, epochs, avg_train_loss, val_report
         );
     }
+
+    let elapsed = start_time.elapsed();
+    println!("\nTraining completed in {:.2}s", elapsed.as_secs_f32());
 
     // 3. Load the best saved checkpoint
     println!("\n--- Loading Best Checkpoint for Testing ---");

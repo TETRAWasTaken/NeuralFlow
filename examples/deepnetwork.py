@@ -275,7 +275,7 @@ def main():
     # 5. Testing with Best Checkpoint
     # ==========================================
     print("\n--- Loading Best Checkpoint for Testing ---")
-    checkpoint = torch.load(checkpoint_path)
+    checkpoint = torch.load(checkpoint_path, weights_only=False)
     model.load_state_dict(checkpoint["model_state_dict"])
     print(f"Loaded model from epoch {checkpoint['epoch']} with best val loss: {checkpoint['val_loss']:.4e}")
 

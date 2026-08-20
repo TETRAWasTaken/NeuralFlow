@@ -1,5 +1,32 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
+
+thread_local! {
+    static GRAD_ENABLED: Cell<bool> = const { Cell::new(true) };
+}
+
+pub fn is_grad_enabled() -> bool {
+    GRAD_ENABLED.with(|g| g.get())
+}
+
+pub fn set_grad_enabled(enabled: bool) -> bool {
+    GRAD_ENABLED.with(|g| g.replace(enabled))
+}
+
+pub struct NoGradGuard {
+    prev: bool,
+}
+
+impl Drop for NoGradGuard {
+    fn drop(&mut self) {
+        set_grad_enabled(self.prev);
+    }
+}
+
+pub fn no_grad() -> NoGradGuard {
+    let prev = set_grad_enabled(false);
+    NoGradGuard { prev }
+}
 
 #[derive(Clone)]
 pub struct Tensor(pub Rc<RefCell<TensorInner>>);

@@ -50,22 +50,18 @@ impl<'a, 'b, D: Dataset> Iterator for DataLoaderIter<'a, 'b, D> {
         let current_batch_size = batch_indices.len();
         self.cursor = end;
 
-        let mut batch_inputs = Vec::new();
-        let mut batch_targets = Vec::new();
-
         let (first_x, first_y) = self.loader.dataset.get(batch_indices[0]);
         let x_dim = first_x.len();
         let y_dim = first_y.len();
 
-        batch_inputs.extend(first_x);
-        batch_targets.extend(first_y);
+        let mut batch_inputs = Vec::with_capacity(current_batch_size * x_dim);
+        let mut batch_targets = Vec::with_capacity(current_batch_size * y_dim);
+
+        batch_inputs.extend_from_slice(&first_x);
+        batch_targets.extend_from_slice(&first_y);
 
         for &idx in &batch_indices[1..] {
-            let (x, y) = self.loader.dataset.get(idx);
-            assert_eq!(x.len(), x_dim, "Inconsistent input dimensions");
-            assert_eq!(y.len(), y_dim, "inconsistent input dimensions");
-            batch_inputs.extend(x);
-            batch_targets.extend(y);
+            self.loader.dataset.get_into(idx, &mut batch_inputs, &mut batch_targets);
         }
 
         let input_tensor = Tensor::new(batch_inputs, (current_batch_size, x_dim));

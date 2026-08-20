@@ -39,19 +39,24 @@ impl Module for Dropout {
         }
 
         let out = Tensor::new(out_data, inner.shape);
-        out.0.borrow_mut().prev = vec![input.clone()];
+        drop(inner);
 
-        let input_clone = input.clone();
-        let out_clone = out.clone();
+        if crate::tensor::is_grad_enabled() {
+            out.0.borrow_mut().prev = vec![input.clone()];
 
-        out.0.borrow_mut().backward = Some(Box::new(move || {
-            let out_grad = out_clone.0.borrow().grad.clone();
-            let mut inp_grad = input_clone.0.borrow_mut();
+            let input_clone = input.clone();
+            let out_clone = out.clone();
 
-            for i in 0..out_grad.len() {
-                inp_grad.grad[i] += out_grad[i] * mask[i];
-            }
-        }));
+            out.0.borrow_mut().backward = Some(Box::new(move || {
+                let out_inner = out_clone.0.borrow();
+                let out_grad = &out_inner.grad;
+                let mut inp_grad = input_clone.0.borrow_mut();
+
+                for i in 0..out_grad.len() {
+                    inp_grad.grad[i] += out_grad[i] * mask[i];
+                }
+            }));
+        }
 
         out
     }
