@@ -113,7 +113,8 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut total_train_loss = 0.0;
         let mut train_batches = 0;
 
-        for (inputs, targets) in train_loader.iter_batches() {
+        let batches = train_loader.collect_batches_par();
+        for (inputs, targets) in batches {
             model.zero_grad();
 
             let pred = model.forward(&inputs);

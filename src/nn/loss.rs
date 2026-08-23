@@ -1,4 +1,7 @@
 use crate::tensor::{is_grad_enabled, Tensor};
+use rayon::prelude::*;
+
+const PARALLEL_THRESHOLD: usize = 32_768;
 
 pub fn mse_loss(pred: &Tensor, target: &Tensor) -> Tensor {
     let p_inner = pred.0.borrow();
@@ -6,13 +9,25 @@ pub fn mse_loss(pred: &Tensor, target: &Tensor) -> Tensor {
     let p_data = &p_inner.data;
     let t_data = &t_inner.data;
 
-    let mut diff_sum = 0.0;
     let n = p_data.len();
-    for i in 0..n {
-        let d = p_data[i] - t_data[i];
-        diff_sum += d * d;
-    }
-    let loss_val = diff_sum / (n as f32);
+    let total_loss: f32 = if n > PARALLEL_THRESHOLD {
+        p_data
+            .par_iter()
+            .zip(t_data.par_iter())
+            .map(|(&p, &t)| {
+                let diff = p - t;
+                diff * diff
+            })
+            .sum()
+    } else {
+        let mut sum = 0.0;
+        for i in 0..n {
+            let diff = p_data[i] - t_data[i];
+            sum += diff * diff;
+        }
+        sum
+    };
+    let loss_val = total_loss / (n as f32);
     drop(p_inner);
     drop(t_inner);
 
@@ -33,8 +48,17 @@ pub fn mse_loss(pred: &Tensor, target: &Tensor) -> Tensor {
             let crate::tensor::inner::TensorInner { data, grad, .. } = &mut *p_inner;
 
             let scale = (2.0 / n as f32) * loss_grad;
-            for i in 0..data.len() {
-                grad[i] += scale * (data[i] - t[i]);
+            if n > PARALLEL_THRESHOLD {
+                grad.par_iter_mut()
+                    .zip(data.par_iter())
+                    .zip(t.par_iter())
+                    .for_each(|((g, &d), &target_val)| {
+                        *g += scale * (d - target_val);
+                    });
+            } else {
+                for i in 0..data.len() {
+                    grad[i] += scale * (data[i] - t[i]);
+                }
             }
         }));
     }

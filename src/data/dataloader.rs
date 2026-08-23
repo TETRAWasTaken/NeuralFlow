@@ -2,6 +2,7 @@ use super::dataset::Dataset;
 use crate::tensor::Tensor;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
+use rayon::prelude::*;
 
 pub struct Dataloader<'a, D: Dataset> {
     dataset: &'a D,
@@ -20,6 +21,7 @@ impl<'a, D: Dataset> Dataloader<'a, D> {
             indices,
         }
     }
+
     pub fn iter_batches(&mut self) -> DataLoaderIter<'a, '_, D> {
         if self.shuffle {
             let mut rng = thread_rng();
@@ -29,6 +31,52 @@ impl<'a, D: Dataset> Dataloader<'a, D> {
             loader: self,
             cursor: 0,
         }
+    }
+
+    /// Pre-materializes and slices all batches for an epoch concurrently across CPU cores using Rayon.
+    pub fn collect_batches_par(&mut self) -> Vec<(Tensor, Tensor)>
+    where
+        D: Sync,
+    {
+        if self.shuffle {
+            let mut rng = thread_rng();
+            self.indices.shuffle(&mut rng);
+        }
+        let chunk_size = self.batch_size;
+        let raw_batches: Vec<(Vec<f32>, Vec<f32>, (usize, usize), (usize, usize))> = self
+            .indices
+            .par_chunks(chunk_size)
+            .map(|batch_indices| {
+                let current_batch_size = batch_indices.len();
+                let (first_x, first_y) = self.dataset.get(batch_indices[0]);
+                let x_dim = first_x.len();
+                let y_dim = first_y.len();
+
+                let mut batch_inputs = Vec::with_capacity(current_batch_size * x_dim);
+                let mut batch_targets = Vec::with_capacity(current_batch_size * y_dim);
+
+                batch_inputs.extend_from_slice(&first_x);
+                batch_targets.extend_from_slice(&first_y);
+
+                for &idx in &batch_indices[1..] {
+                    self.dataset.get_into(idx, &mut batch_inputs, &mut batch_targets);
+                }
+
+                (
+                    batch_inputs,
+                    batch_targets,
+                    (current_batch_size, x_dim),
+                    (current_batch_size, y_dim),
+                )
+            })
+            .collect();
+
+        raw_batches
+            .into_iter()
+            .map(|(bx, by, x_shape, y_shape)| {
+                (Tensor::new(bx, x_shape), Tensor::new(by, y_shape))
+            })
+            .collect()
     }
 }
 

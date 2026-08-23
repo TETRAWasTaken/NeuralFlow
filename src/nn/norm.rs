@@ -1,5 +1,8 @@
 use super::module::Module;
 use crate::tensor::Tensor;
+use rayon::prelude::*;
+
+const PARALLEL_THRESHOLD: usize = 32_768;
 
 pub struct LayerNorm {
     pub gamma: Tensor, 
@@ -32,21 +35,45 @@ impl Module for LayerNorm {
         let mut out_data = vec![0.0; b * d];
         let mut x_hat = vec![0.0; b * d];
         let mut inv_std = vec![0.0; b];
+        let eps = self.eps;
 
-        for i in 0..b {
-            let row_start = i * d;
-            let row = &x[row_start..row_start + d];
-            let mean: f32 = row.iter().sum::<f32>() / (d as f32);
-            let var: f32 = row.iter().map(|&v| (v - mean).powi(2)).sum::<f32>() / (d as f32);
-            let istd = 1.0 / (var + self.eps).sqrt();
-            inv_std[i] = istd;
-            for j in 0..d {
-                let idx = row_start + j;
-                let x_hat_val = (x[idx] - mean) * istd;
-                x_hat[idx] = x_hat_val;
-                out_data[idx] = x_hat_val * gamma_data[j] + beta_data[j];
+        let total_elements = b * d;
+        if total_elements > PARALLEL_THRESHOLD {
+            out_data
+                .par_chunks_exact_mut(d)
+                .zip(x_hat.par_chunks_exact_mut(d))
+                .zip(inv_std.par_iter_mut())
+                .zip(x.par_chunks_exact(d))
+                .for_each(|(((out_row, xh_row), istd), x_row)| {
+                    let mean: f32 = x_row.iter().sum::<f32>() / (d as f32);
+                    let var: f32 = x_row.iter().map(|&v| (v - mean) * (v - mean)).sum::<f32>() / (d as f32);
+                    let inv_s = 1.0 / (var + eps).sqrt();
+                    *istd = inv_s;
+
+                    for j in 0..d {
+                        let norm_val = (x_row[j] - mean) * inv_s;
+                        xh_row[j] = norm_val;
+                        out_row[j] = norm_val * gamma_data[j] + beta_data[j];
+                    }
+                });
+        } else {
+            for i in 0..b {
+                let row_start = i * d;
+                let row = &x[row_start..row_start + d];
+                let mean: f32 = row.iter().sum::<f32>() / (d as f32);
+                let var: f32 = row.iter().map(|&v| (v - mean) * (v - mean)).sum::<f32>() / (d as f32);
+                let istd = 1.0 / (var + eps).sqrt();
+                inv_std[i] = istd;
+
+                for j in 0..d {
+                    let idx = row_start + j;
+                    let norm_val = (x[idx] - mean) * istd;
+                    x_hat[idx] = norm_val;
+                    out_data[idx] = norm_val * gamma_data[j] + beta_data[j];
+                }
             }
         }
+
         drop(inp_inner);
         drop(gamma_inner);
         drop(beta_inner);
@@ -73,31 +100,66 @@ impl Module for LayerNorm {
                 let beta_grad = &mut beta_inner.grad;
                 let inp_grad = &mut inp_inner.grad;
 
+                // Accumulate parameter gradients across batch
                 for i in 0..b {
                     let row_start = i * d;
-                    let istd = inv_std[i];
-                    let mut sum_dout_gamma = 0.0;
-                    let mut sum_dout_gamma_xhat = 0.0;
-
                     for j in 0..d {
-                        let idx = row_start + j;
-                        let dout = out_grad[idx];
-                        let xh = x_hat[idx];
+                        let dout = out_grad[row_start + j];
+                        let xh = x_hat[row_start + j];
                         gamma_grad[j] += dout * xh;
                         beta_grad[j] += dout;
-
-                        let dout_gamma = dout * g_data[j];
-                        sum_dout_gamma += dout_gamma;
-                        sum_dout_gamma_xhat += dout_gamma * xh;
                     }
+                }
 
-                    for j in 0..d {
-                        let idx = row_start + j;
-                        let dout_gamma = out_grad[idx] * g_data[j];
-                        let xh = x_hat[idx];
-                        let dx = (istd / d as f32)
-                            * (d as f32 * dout_gamma - sum_dout_gamma - xh * sum_dout_gamma_xhat);
-                        inp_grad[idx] += dx;
+                // Row-by-row input gradient backpropagation
+                if total_elements > PARALLEL_THRESHOLD {
+                    inp_grad
+                        .par_chunks_exact_mut(d)
+                        .zip(out_grad.par_chunks_exact(d))
+                        .zip(x_hat.par_chunks_exact(d))
+                        .zip(inv_std.par_iter())
+                        .for_each(|(((inp_grad_row, out_grad_row), xh_row), &istd)| {
+                            let mut sum_dout_gamma = 0.0;
+                            let mut sum_dout_gamma_xhat = 0.0;
+
+                            for j in 0..d {
+                                let dout_gamma = out_grad_row[j] * g_data[j];
+                                let xh = xh_row[j];
+                                sum_dout_gamma += dout_gamma;
+                                sum_dout_gamma_xhat += dout_gamma * xh;
+                            }
+
+                            let scale = istd / (d as f32);
+                            let d_f32 = d as f32;
+                            for j in 0..d {
+                                let dout_gamma = out_grad_row[j] * g_data[j];
+                                let xh = xh_row[j];
+                                let dx = scale * (d_f32 * dout_gamma - sum_dout_gamma - xh * sum_dout_gamma_xhat);
+                                inp_grad_row[j] += dx;
+                            }
+                        });
+                } else {
+                    for i in 0..b {
+                        let row_start = i * d;
+                        let istd = inv_std[i];
+                        let mut sum_dout_gamma = 0.0;
+                        let mut sum_dout_gamma_xhat = 0.0;
+
+                        for j in 0..d {
+                            let dout_gamma = out_grad[row_start + j] * g_data[j];
+                            let xh = x_hat[row_start + j];
+                            sum_dout_gamma += dout_gamma;
+                            sum_dout_gamma_xhat += dout_gamma * xh;
+                        }
+
+                        let scale = istd / (d as f32);
+                        let d_f32 = d as f32;
+                        for j in 0..d {
+                            let dout_gamma = out_grad[row_start + j] * g_data[j];
+                            let xh = x_hat[row_start + j];
+                            let dx = scale * (d_f32 * dout_gamma - sum_dout_gamma - xh * sum_dout_gamma_xhat);
+                            inp_grad[row_start + j] += dx;
+                        }
                     }
                 }
             }));
