@@ -76,7 +76,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     let out_features = 1;
 
     let model = DeepNet::new(in_features, hidden_dim, out_features);
-    let optimizer = SGD::new(5e-2);
+    let mut optimizer = Adam::new(1e-3, 0.9, 0.999, 1e-7, 0.01);
 
     println!("--- Loading Dataset ---");
     let dataset = CsvDataset::from_file("examples/housing.csv", 8, true)?;
@@ -88,8 +88,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     target_scaler.fit_targets(&dataset);
     let dataset = TransformedDataset::with_target_scaler(&dataset, &scaler, &target_scaler);
 
-    let (train_data, val_data, test_data) =
-        train_val_test_split(&dataset, 0.7, 0.15, 0.15, true);
+    let (train_data, val_data, test_data) = train_val_test_split(&dataset, 0.7, 0.15, 0.15, true);
     println!(
         "Dataset split: {} train, {} validation, {} test samples.",
         train_data.len(),
@@ -98,7 +97,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let batch_size = 256;
-    let epochs = 50;
+    let epochs = 100;
     let checkpoint_path = "best_deepnet.bin";
 
     let mut train_loader = Dataloader::new(&train_data, batch_size, true);
@@ -113,7 +112,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut total_train_loss = 0.0;
         let mut train_batches = 0;
 
-        let batches = train_loader.collect_batches_par();
+        let batches = train_loader.iter_batches();
         for (inputs, targets) in batches {
             model.zero_grad();
 

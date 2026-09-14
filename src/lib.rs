@@ -17,7 +17,7 @@ pub mod prelude {
     pub use crate::nn::{
         Dropout, LayerNorm, LeakyReLu, Linear, Module, ReLu, Sigmoid, Tanh, mse_loss,
     };
-    pub use crate::optim::{optimizer::Optimizer, sgd::SGD};
+    pub use crate::optim::{optimizer::Optimizer, sgd::SGD, adam::Adam};
     pub use crate::tensor::{is_grad_enabled, no_grad, set_grad_enabled, NoGradGuard, Tensor};
     pub use crate::utils::checkpoint::{BestModelSaver, ModelCheckpoint};
     pub use crate::utils::serialisation::TensorState;

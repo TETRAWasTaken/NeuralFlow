@@ -15,7 +15,7 @@ impl SGD {
 const PARALLEL_THRESHOLD: usize = 32_768;
 
 impl Optimizer for SGD {
-    fn step(&self, parameters: &[Tensor]) {
+    fn step(&mut self, parameters: &[Tensor]) {
         let lr = self.lr;
         for param in parameters {
             let mut p = param.0.borrow_mut();

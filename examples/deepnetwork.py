@@ -173,9 +173,9 @@ def main():
     in_features = 9
     hidden_dim = 64
     out_features = 1
-    learning_rate = 5e-2
+    learning_rate = 1e-3
     batch_size = 256
-    epochs = 50
+    epochs = 100
     checkpoint_path = "best_deepnet_py.pt"
 
     # Set seed for reproducible comparison
@@ -220,7 +220,7 @@ def main():
 
     model = DeepNet(in_features, hidden_dim, out_features)
     criterion = nn.MSELoss()
-    optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
 
     best_val_loss = float("inf")
 
