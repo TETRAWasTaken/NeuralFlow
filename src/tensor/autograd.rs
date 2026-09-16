@@ -28,9 +28,14 @@ impl Tensor {
             }
         }
         for node in topo.iter().rev() {
-            if let Some(ref backward_fn) = node.0.borrow().backward {
-                backward_fn();
+            let backward_fn = node.0.borrow_mut().backward.take();
+            if let Some(f) = backward_fn {
+                f();
             }   
+        }
+
+        for node in &topo {
+            node.0.borrow_mut().prev.clear();
         }
     }
 }

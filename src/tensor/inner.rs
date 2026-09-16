@@ -78,6 +78,35 @@ impl Tensor {
         self.0.borrow().shape
     }
 
+    pub fn reshape_4d(&self, shape: (usize, usize, usize, usize)) -> Self {
+        let n = self.0.borrow().data.len();
+        let expected = shape.0 * shape.1 * shape.2 * shape.3;
+        assert_eq!(
+            n, expected,
+            "Cannot reshape tensor with {} elements to 4D shape {:?}",
+            n, shape
+        );
+
+        let out = Self::new_4d(self.0.borrow().data.clone(), shape);
+
+        if is_grad_enabled() {
+            out.0.borrow_mut().prev = vec![self.clone()];
+            let self_clone = self.clone();
+            let out_clone = out.clone();
+
+            out.0.borrow_mut().backward = Some(Box::new(move || {
+                let out_inner = out_clone.0.borrow();
+                let out_grad = &out_inner.grad;
+                let mut self_inner = self_clone.0.borrow_mut();
+                for (sg, &og) in self_inner.grad.iter_mut().zip(out_grad.iter()) {
+                    *sg += og;
+                }
+            }));
+        }
+
+        out
+    }
+
     pub fn zeros(shape: (usize, usize)) -> Self {
         Self::new(vec![0.0; shape.0 * shape.1], shape)
     }

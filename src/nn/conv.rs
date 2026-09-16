@@ -1,6 +1,7 @@
 use super::module::Module;
 use crate::tensor::im2col::{col2im, im2col};
 use crate::tensor::{is_grad_enabled, Tensor};
+use rayon::prelude::*;
 
 pub struct Conv2d {
     pub in_channels: usize,
@@ -96,6 +97,7 @@ impl Module for Conv2d {
         let out_w = (w_in + 2 * pad_w - k_w) / stride_w + 1;
         let out_spatial = out_h * out_w;
         let col_rows = self.in_channels * k_h * k_w;
+        let col_size = col_rows * out_spatial;
 
         let in_image_size = c_in * h_in * w_in;
         let out_image_size = self.out_channels * out_spatial;
@@ -106,75 +108,112 @@ impl Module for Conv2d {
         let w_inner = self.weights.0.borrow();
         let w_data = &w_inner.data;
 
-        let mut all_cols = if is_grad_enabled() {
-            Some(Vec::with_capacity(n_batch * col_rows * out_spatial))
+        let out_channels = self.out_channels;
+
+        let all_cols = if is_grad_enabled() {
+            let mut cols = vec![0.0; n_batch * col_size];
+            out_data
+                .par_chunks_exact_mut(out_image_size)
+                .zip(cols.par_chunks_exact_mut(col_size))
+                .enumerate()
+                .for_each(|(n, (out_slice, col_slice))| {
+                    let im_slice = &in_data[n * in_image_size..(n + 1) * in_image_size];
+                    im2col(
+                        im_slice,
+                        c_in,
+                        h_in,
+                        w_in,
+                        k_h,
+                        k_w,
+                        pad_h,
+                        pad_w,
+                        stride_h,
+                        stride_w,
+                        out_h,
+                        out_w,
+                        col_slice,
+                    );
+
+                    unsafe {
+                        crate::tensor::blas::gemm(
+                            false,
+                            false,
+                            out_channels,
+                            out_spatial,
+                            col_rows,
+                            1.0,
+                            w_data.as_ptr(),
+                            col_slice.as_ptr(),
+                            0.0,
+                            out_slice.as_mut_ptr(),
+                        );
+                    }
+                });
+            Some(cols)
         } else {
+            out_data
+                .par_chunks_exact_mut(out_image_size)
+                .enumerate()
+                .for_each_init(
+                    || vec![0.0; col_size],
+                    |col, (n, out_slice)| {
+                        let im_slice = &in_data[n * in_image_size..(n + 1) * in_image_size];
+                        im2col(
+                            im_slice,
+                            c_in,
+                            h_in,
+                            w_in,
+                            k_h,
+                            k_w,
+                            pad_h,
+                            pad_w,
+                            stride_h,
+                            stride_w,
+                            out_h,
+                            out_w,
+                            col,
+                        );
+
+                        unsafe {
+                            crate::tensor::blas::gemm(
+                                false,
+                                false,
+                                out_channels,
+                                out_spatial,
+                                col_rows,
+                                1.0,
+                                w_data.as_ptr(),
+                                col.as_ptr(),
+                                0.0,
+                                out_slice.as_mut_ptr(),
+                            );
+                        }
+                    },
+                );
             None
         };
-
-        let mut col = vec![0.0; col_rows * out_spatial];
-
-        for n in 0..n_batch {
-            let im_slice = &in_data[n * in_image_size..(n + 1) * in_image_size];
-            im2col(
-                im_slice,
-                c_in,
-                h_in,
-                w_in,
-                k_h,
-                k_w,
-                pad_h,
-                pad_w,
-                stride_h,
-                stride_w,
-                out_h,
-                out_w,
-                &mut col,
-            );
-
-            let out_slice =
-                &mut out_data[n * out_image_size..(n + 1) * out_image_size];
-
-            unsafe {
-                crate::tensor::blas::gemm(
-                    false,
-                    false,
-                    self.out_channels,
-                    out_spatial,
-                    col_rows,
-                    1.0,
-                    w_data.as_ptr(),
-                    col.as_ptr(),
-                    0.0,
-                    out_slice.as_mut_ptr(),
-                );
-            }
-
-            if let Some(ref mut cols_buf) = all_cols {
-                cols_buf.extend_from_slice(&col);
-            }
-        }
 
         drop(w_inner);
         drop(in_inner);
 
-        // Add bias if present
+        // Add bias if present (parallel across batch samples)
         if let Some(ref bias_tensor) = self.bias {
             let b_inner = bias_tensor.0.borrow();
             let b_data = &b_inner.data;
-            for n in 0..n_batch {
-                let out_offset = n * out_image_size;
-                for c in 0..self.out_channels {
-                    let b_val = b_data[c];
-                    let ch_offset = out_offset + c * out_spatial;
-                    for s in 0..out_spatial {
-                        out_data[ch_offset + s] += b_val;
+            out_data
+                .par_chunks_exact_mut(out_image_size)
+                .for_each(|out_slice| {
+                    for c in 0..out_channels {
+                        let b_val = b_data[c];
+                        let ch_offset = c * out_spatial;
+                        for s in 0..out_spatial {
+                            out_slice[ch_offset + s] += b_val;
+                        }
                     }
-                }
-            }
+                });
         }
 
-        let out = Tensor::new_4d(out_data, (n_batch, self.out_channels, out_h, out_w));
+        let out = Tensor::new_4d(out_data, (n_batch, out_channels, out_h, out_w));
 
         if is_grad_enabled() {
             let mut prev = vec![input.clone(), self.weights.clone()];
@@ -200,88 +239,113 @@ impl Module for Conv2d {
                 if let Some(ref b) = bias_clone {
                     let mut b_inner = b.0.borrow_mut();
                     let b_grad = &mut b_inner.grad;
-                    for n in 0..n_batch {
-                        let out_offset = n * out_image_size;
-                        for c in 0..out_channels {
-                            let ch_offset = out_offset + c * out_spatial;
-                            let sum: f32 = out_grad[ch_offset..ch_offset + out_spatial]
+                    for c in 0..out_channels {
+                        let mut sum = 0.0f32;
+                        for n in 0..n_batch {
+                            let ch_offset = n * out_image_size + c * out_spatial;
+                            let s: f32 = out_grad[ch_offset..ch_offset + out_spatial]
                                 .iter()
                                 .sum();
-                            b_grad[c] += sum;
+                            sum += s;
                         }
+                        b_grad[c] += sum;
                     }
                 }
 
-                // 2. Weights gradient
+                // 2. Weights gradient (parallel across batch samples via fold and reduce)
                 let col_size = col_rows * out_spatial;
+                let w_size = out_channels * col_rows;
+                let thread_w_grads: Vec<f32> = (0..n_batch)
+                    .into_par_iter()
+                    .fold(
+                        || vec![0.0f32; w_size],
+                        |mut local_w_grad, n| {
+                            let out_grad_slice =
+                                &out_grad[n * out_image_size..(n + 1) * out_image_size];
+                            let col_slice = &saved_cols[n * col_size..(n + 1) * col_size];
+
+                            unsafe {
+                                crate::tensor::blas::gemm(
+                                    false,
+                                    true, // Col transposed: (col_rows, out_spatial) -> (out_spatial, col_rows)
+                                    out_channels,
+                                    col_rows,
+                                    out_spatial,
+                                    1.0,
+                                    out_grad_slice.as_ptr(),
+                                    col_slice.as_ptr(),
+                                    1.0, // Accumulate into local_w_grad
+                                    local_w_grad.as_mut_ptr(),
+                                );
+                            }
+                            local_w_grad
+                        },
+                    )
+                    .reduce(
+                        || vec![0.0f32; w_size],
+                        |mut a, b| {
+                            for (ai, bi) in a.iter_mut().zip(b.iter()) {
+                                *ai += *bi;
+                            }
+                            a
+                        },
+                    );
+
                 {
                     let mut w_inner = weights_clone.0.borrow_mut();
-                    for n in 0..n_batch {
-                        let out_grad_slice =
-                            &out_grad[n * out_image_size..(n + 1) * out_image_size];
-                        let col_slice = &saved_cols[n * col_size..(n + 1) * col_size];
-
-                        unsafe {
-                            crate::tensor::blas::gemm(
-                                false,
-                                true, // Col transposed: (col_rows, out_spatial) -> (out_spatial, col_rows)
-                                out_channels,
-                                col_rows,
-                                out_spatial,
-                                1.0,
-                                out_grad_slice.as_ptr(),
-                                col_slice.as_ptr(),
-                                1.0, // Accumulate directly into w_inner.grad
-                                w_inner.grad.as_mut_ptr(),
-                            );
-                        }
+                    for (g, &tg) in w_inner.grad.iter_mut().zip(thread_w_grads.iter()) {
+                        *g += tg;
                     }
                 }
 
-                // 3. Input gradient
+                // 3. Input gradient (parallel across batch samples with zero heap allocation in loop)
                 {
                     let w_inner = weights_clone.0.borrow();
                     let w_data = &w_inner.data;
                     let mut in_inner = input_clone.0.borrow_mut();
-                    let mut d_col = vec![0.0; col_size];
 
-                    for n in 0..n_batch {
-                        let out_grad_slice =
-                            &out_grad[n * out_image_size..(n + 1) * out_image_size];
+                    in_inner
+                        .grad
+                        .par_chunks_exact_mut(in_image_size)
+                        .enumerate()
+                        .for_each_init(
+                            || vec![0.0f32; col_size],
+                            |d_col, (n, in_grad_slice)| {
+                                let out_grad_slice =
+                                    &out_grad[n * out_image_size..(n + 1) * out_image_size];
 
-                        unsafe {
-                            crate::tensor::blas::gemm(
-                                true, // W transposed: (out_channels, col_rows) -> (col_rows, out_channels)
-                                false,
-                                col_rows,
-                                out_spatial,
-                                out_channels,
-                                1.0,
-                                w_data.as_ptr(),
-                                out_grad_slice.as_ptr(),
-                                0.0,
-                                d_col.as_mut_ptr(),
-                            );
-                        }
+                                unsafe {
+                                    crate::tensor::blas::gemm(
+                                        true, // W transposed: (out_channels, col_rows) -> (col_rows, out_channels)
+                                        false,
+                                        col_rows,
+                                        out_spatial,
+                                        out_channels,
+                                        1.0,
+                                        w_data.as_ptr(),
+                                        out_grad_slice.as_ptr(),
+                                        0.0,
+                                        d_col.as_mut_ptr(),
+                                    );
+                                }
 
-                        let in_grad_slice =
-                            &mut in_inner.grad[n * in_image_size..(n + 1) * in_image_size];
-                        col2im(
-                            &d_col,
-                            in_channels,
-                            h_in,
-                            w_in,
-                            k_h,
-                            k_w,
-                            pad_h,
-                            pad_w,
-                            stride_h,
-                            stride_w,
-                            out_h,
-                            out_w,
-                            in_grad_slice,
+                                col2im(
+                                    d_col,
+                                    in_channels,
+                                    h_in,
+                                    w_in,
+                                    k_h,
+                                    k_w,
+                                    pad_h,
+                                    pad_w,
+                                    stride_h,
+                                    stride_w,
+                                    out_h,
+                                    out_w,
+                                    in_grad_slice,
+                                );
+                            },
                         );
-                    }
                 }
             }));
         }

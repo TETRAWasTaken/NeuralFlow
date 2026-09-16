@@ -35,18 +35,43 @@ pub fn im2col(
 
                     if ih >= 0 && ih < height as isize {
                         let im_row_offset = im_c_offset + (ih as usize) * width;
-                        for ow in 0..out_w {
-                            let iw = (ow * stride_w) as isize - pad_w as isize + kx as isize;
-                            if iw >= 0 && iw < width as isize {
-                                data_col[col_oh_offset + ow] = data_im[im_row_offset + iw as usize];
-                            } else {
-                                data_col[col_oh_offset + ow] = 0.0;
+
+                        if stride_w == 1 {
+                            // Fast path: contiguous memory copy
+                            let ow_start = (pad_w as isize - kx as isize).max(0) as usize;
+                            let ow_start = ow_start.min(out_w);
+                            let ow_end = ((width + pad_w) as isize - kx as isize).max(0) as usize;
+                            let ow_end = ow_end.min(out_w);
+
+                            // Left padding
+                            if ow_start > 0 {
+                                data_col[col_oh_offset..col_oh_offset + ow_start].fill(0.0);
+                            }
+
+                            // Middle: contiguous valid pixels
+                            if ow_end > ow_start {
+                                let iw_start = (ow_start as isize - pad_w as isize + kx as isize) as usize;
+                                let len = ow_end - ow_start;
+                                let src = &data_im[im_row_offset + iw_start..im_row_offset + iw_start + len];
+                                data_col[col_oh_offset + ow_start..col_oh_offset + ow_end].copy_from_slice(src);
+                            }
+
+                            // Right padding
+                            if ow_end < out_w {
+                                data_col[col_oh_offset + ow_end..col_oh_offset + out_w].fill(0.0);
+                            }
+                        } else {
+                            for ow in 0..out_w {
+                                let iw = (ow * stride_w) as isize - pad_w as isize + kx as isize;
+                                if iw >= 0 && iw < width as isize {
+                                    data_col[col_oh_offset + ow] = data_im[im_row_offset + iw as usize];
+                                } else {
+                                    data_col[col_oh_offset + ow] = 0.0;
+                                }
                             }
                         }
                     } else {
-                        for ow in 0..out_w {
-                            data_col[col_oh_offset + ow] = 0.0;
-                        }
+                        data_col[col_oh_offset..col_oh_offset + out_w].fill(0.0);
                     }
                 }
                 col_row += 1;
@@ -86,10 +111,28 @@ pub fn col2im(
 
                     if ih >= 0 && ih < height as isize {
                         let im_row_offset = im_c_offset + (ih as usize) * width;
-                        for ow in 0..out_w {
-                            let iw = (ow * stride_w) as isize - pad_w as isize + kx as isize;
-                            if iw >= 0 && iw < width as isize {
-                                data_im[im_row_offset + iw as usize] += data_col[col_oh_offset + ow];
+
+                        if stride_w == 1 {
+                            let ow_start = (pad_w as isize - kx as isize).max(0) as usize;
+                            let ow_start = ow_start.min(out_w);
+                            let ow_end = ((width + pad_w) as isize - kx as isize).max(0) as usize;
+                            let ow_end = ow_end.min(out_w);
+
+                            if ow_end > ow_start {
+                                let iw_start = (ow_start as isize - pad_w as isize + kx as isize) as usize;
+                                let len = ow_end - ow_start;
+                                let dst = &mut data_im[im_row_offset + iw_start..im_row_offset + iw_start + len];
+                                let src = &data_col[col_oh_offset + ow_start..col_oh_offset + ow_end];
+                                for (d, &s) in dst.iter_mut().zip(src.iter()) {
+                                    *d += s;
+                                }
+                            }
+                        } else {
+                            for ow in 0..out_w {
+                                let iw = (ow * stride_w) as isize - pad_w as isize + kx as isize;
+                                if iw >= 0 && iw < width as isize {
+                                    data_im[im_row_offset + iw as usize] += data_col[col_oh_offset + ow];
+                                }
                             }
                         }
                     }
