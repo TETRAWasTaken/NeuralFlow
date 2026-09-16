@@ -83,7 +83,7 @@ fn test_sgd_step() {
         let mut inner = w.0.borrow_mut();
         inner.grad = vec![0.1, 0.2, 0.3];
     }
-    let optimizer = SGD::new(0.5);
+    let mut optimizer = SGD::new(0.5);
     optimizer.step(&[w.clone()]);
 
     let inner = w.0.borrow();

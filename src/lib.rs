@@ -15,7 +15,8 @@ pub mod prelude {
     };
     pub use crate::eval::{EvaluationReport, Evaluator, Metrics};
     pub use crate::nn::{
-        Dropout, LayerNorm, LeakyReLu, Linear, Module, ReLu, Sigmoid, Tanh, mse_loss,
+        bce_loss, bce_with_logits_loss, cross_entropy_loss, AvgPool2d, Conv2d, Dropout, Flatten,
+        LayerNorm, LeakyReLu, Linear, MaxPool2d, Module, mse_loss, ReLu, Sequential, Sigmoid, Tanh,
     };
     pub use crate::optim::{optimizer::Optimizer, sgd::SGD, adam::Adam};
     pub use crate::tensor::{is_grad_enabled, no_grad, set_grad_enabled, NoGradGuard, Tensor};

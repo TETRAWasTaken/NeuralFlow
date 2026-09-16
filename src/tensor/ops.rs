@@ -112,9 +112,14 @@ impl Tensor {
                 .collect()
         };
         let shape = inner.shape;
+        let shape4d = inner.shape4d;
         drop(inner);
 
-        let out = Tensor::new(out_data, shape);
+        let out = if let Some(s4) = shape4d {
+            Tensor::new_4d(out_data, s4)
+        } else {
+            Tensor::new(out_data, shape)
+        };
 
         if is_grad_enabled() {
             out.0.borrow_mut().prev = vec![self.clone()];
@@ -156,9 +161,14 @@ impl Tensor {
                 .collect()
         };
         let shape = inner.shape;
+        let shape4d = inner.shape4d;
         drop(inner);
 
-        let out = Tensor::new(out_data, shape);
+        let out = if let Some(s4) = shape4d {
+            Tensor::new_4d(out_data, s4)
+        } else {
+            Tensor::new(out_data, shape)
+        };
 
         if is_grad_enabled() {
             out.0.borrow_mut().prev = vec![self.clone()];
@@ -191,9 +201,14 @@ impl Tensor {
             inner.data.iter().map(|&x| x.tanh()).collect()
         };
         let shape = inner.shape;
+        let shape4d = inner.shape4d;
         drop(inner);
 
-        let out = Tensor::new(out_data, shape);
+        let out = if let Some(s4) = shape4d {
+            Tensor::new_4d(out_data, s4)
+        } else {
+            Tensor::new(out_data, shape)
+        };
 
         if is_grad_enabled() {
             out.0.borrow_mut().prev = vec![self.clone()];
@@ -235,9 +250,14 @@ impl Tensor {
                 .collect()
         };
         let shape = inner.shape;
+        let shape4d = inner.shape4d;
         drop(inner);
 
-        let out = Tensor::new(out_data, shape);
+        let out = if let Some(s4) = shape4d {
+            Tensor::new_4d(out_data, s4)
+        } else {
+            Tensor::new(out_data, shape)
+        };
 
         if is_grad_enabled() {
             out.0.borrow_mut().prev = vec![self.clone()];

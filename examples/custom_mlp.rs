@@ -33,7 +33,7 @@ impl Module for MyCustomModel {
 
 fn main() {
     let model = MyCustomModel::new();
-    let optimizer = SGD::new(0.01);
+    let mut optimizer = SGD::new(0.01);
 
     let input = Tensor::new(vec![0.5, -0.2], (1, 2));
     let target = Tensor::new(vec![1.0], (1, 1));

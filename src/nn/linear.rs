@@ -8,6 +8,12 @@ pub struct Linear {
 impl Linear {
     pub fn new(in_features: usize, out_features: usize) -> Self {
         Self {
+            weights: Tensor::kaiming_normal((in_features, out_features)),
+        }
+    }
+
+    pub fn random(in_features: usize, out_features: usize) -> Self {
+        Self {
             weights: Tensor::random((in_features, out_features)),
         }
     }

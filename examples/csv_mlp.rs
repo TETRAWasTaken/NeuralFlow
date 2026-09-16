@@ -54,7 +54,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let out_features = 1;
 
     let model = HousingModel::new(in_features, hidden_dim, out_features);
-    let optimizer = SGD::new(1e-9);
+    let mut optimizer = SGD::new(1e-9);
 
     let batch_size = 64;
     let epochs = 50;

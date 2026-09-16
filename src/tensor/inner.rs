@@ -35,6 +35,7 @@ pub struct TensorInner {
     pub data: Vec<f32>,
     pub grad: Vec<f32>,
     pub shape: (usize, usize),
+    pub shape4d: Option<(usize, usize, usize, usize)>,
     pub backward: Option<Box<dyn Fn()>>,
     pub prev: Vec<Tensor>,
 }
@@ -48,18 +49,92 @@ impl Tensor {
             data,
             grad: vec![0.0; n],
             shape,
+            shape4d: None,
             backward: None,
             prev: vec![],
         })))
+    }
+
+    pub fn new_4d(data: Vec<f32>, shape: (usize, usize, usize, usize)) -> Self {
+        let n = data.len();
+        let expected = shape.0 * shape.1 * shape.2 * shape.3;
+        assert_eq!(n, expected, "Data length {} does not match 4D shape {:?}", n, shape);
+
+        Tensor(Rc::new(RefCell::new(TensorInner {
+            data,
+            grad: vec![0.0; n],
+            shape: (shape.0, shape.1 * shape.2 * shape.3),
+            shape4d: Some(shape),
+            backward: None,
+            prev: vec![],
+        })))
+    }
+
+    pub fn shape4d(&self) -> Option<(usize, usize, usize, usize)> {
+        self.0.borrow().shape4d
+    }
+
+    pub fn shape(&self) -> (usize, usize) {
+        self.0.borrow().shape
     }
 
     pub fn zeros(shape: (usize, usize)) -> Self {
         Self::new(vec![0.0; shape.0 * shape.1], shape)
     }
 
+    pub fn zeros_4d(shape: (usize, usize, usize, usize)) -> Self {
+        Self::new_4d(vec![0.0; shape.0 * shape.1 * shape.2 * shape.3], shape)
+    }
+
+    pub fn random_4d(shape: (usize, usize, usize, usize)) -> Self {
+        let len = shape.0 * shape.1 * shape.2 * shape.3;
+        let data = (0..len).map(|_| (rand::random::<f32>() * 2.0) - 1.0).collect();
+        Self::new_4d(data, shape)
+    }
+
     pub fn random(shape: (usize, usize)) -> Self {
         let len = shape.0 * shape.1;
         let data = (0..len).map(|_| (rand::random::<f32>() * 2.0) - 1.0).collect();
+        Self::new(data, shape)
+    }
+
+    pub fn kaiming_normal(shape: (usize, usize)) -> Self {
+        let (fan_in, _) = shape;
+        assert!(fan_in > 0, "fan_in must be greater than 0");
+        let std_dev = (2.0 / fan_in as f32).sqrt();
+        let len = shape.0 * shape.1;
+        let mut data = Vec::with_capacity(len);
+
+        while data.len() < len {
+            // Box-Muller transform for normal distribution
+            let u1 = rand::random::<f32>().max(f32::EPSILON);
+            let u2 = rand::random::<f32>();
+
+            let r = (-2.0 * u1.ln()).sqrt();
+            let theta = 2.0 * std::f32::consts::PI * u2;
+
+            let z0 = r * theta.cos() * std_dev;
+            let z1 = r * theta.sin() * std_dev;
+
+            data.push(z0);
+            if data.len() < len {
+                data.push(z1);
+            }
+        }
+
+        Self::new(data, shape)
+    }
+
+    pub fn kaiming_uniform(shape: (usize, usize)) -> Self {
+        let (fan_in, _) = shape;
+        assert!(fan_in > 0, "fan_in must be greater than 0");
+        let bound = (6.0 / fan_in as f32).sqrt();
+        let len = shape.0 * shape.1;
+
+        let data = (0..len)
+            .map(|_| (rand::random::<f32>() * 2.0 - 1.0) * bound)
+            .collect();
+
         Self::new(data, shape)
     }
 

@@ -118,4 +118,81 @@ impl Metrics {
             1.0 - (ss_res / ss_tot)
         }
     }
+
+    pub fn accuracy(preds: &[f32], targets: &[f32]) -> f32 {
+        assert_eq!(preds.len(), targets.len());
+        let len = preds.len();
+        if len == 0 {
+            return 0.0;
+        }
+
+        let correct: usize = if len > PARALLEL_THRESHOLD {
+            preds
+                .par_iter()
+                .zip(targets.par_iter())
+                .filter(|&(p, t)| p.round() == t.round())
+                .count()
+        } else {
+            preds
+                .iter()
+                .zip(targets.iter())
+                .filter(|&(p, t)| p.round() == t.round())
+                .count()
+        };
+
+        (correct as f32) / (len as f32)
+    }
+
+    pub fn accuracy_logits(logits: &[f32], targets: &[f32], num_classes: usize) -> f32 {
+        assert!(num_classes > 0, "num_classes must be greater than 0");
+        assert_eq!(
+            logits.len() % num_classes,
+            0,
+            "logits length must be divisible by num_classes"
+        );
+        let num_samples = logits.len() / num_classes;
+        assert_eq!(
+            targets.len(),
+            num_samples,
+            "targets count must match num_samples"
+        );
+        if num_samples == 0 {
+            return 0.0;
+        }
+
+        let correct: usize = if num_samples > PARALLEL_THRESHOLD {
+            (0..num_samples)
+                .into_par_iter()
+                .filter(|&i| {
+                    let row = &logits[i * num_classes..(i + 1) * num_classes];
+                    let mut max_val = f32::NEG_INFINITY;
+                    let mut max_idx = 0;
+                    for (c, &val) in row.iter().enumerate() {
+                        if val > max_val {
+                            max_val = val;
+                            max_idx = c;
+                        }
+                    }
+                    max_idx == targets[i].round() as usize
+                })
+                .count()
+        } else {
+            (0..num_samples)
+                .filter(|&i| {
+                    let row = &logits[i * num_classes..(i + 1) * num_classes];
+                    let mut max_val = f32::NEG_INFINITY;
+                    let mut max_idx = 0;
+                    for (c, &val) in row.iter().enumerate() {
+                        if val > max_val {
+                            max_val = val;
+                            max_idx = c;
+                        }
+                    }
+                    max_idx == targets[i].round() as usize
+                })
+                .count()
+        };
+
+        (correct as f32) / (num_samples as f32)
+    }
 }
