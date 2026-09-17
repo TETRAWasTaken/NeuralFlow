@@ -10,6 +10,11 @@ impl Module for ReLu {
     fn parameters(&self) -> Vec<Tensor> {
         vec![]
     }
+
+    #[cfg(feature = "xla")]
+    fn trace_xla(&self, builder: &xla::XlaBuilder, input: &xla::XlaOp) -> Result<xla::XlaOp, xla::Error> {
+        crate::xla::XlaTraceable::trace(self, builder, input)
+    }
 }
 
 pub struct Sigmoid;
@@ -20,6 +25,11 @@ impl Module for Sigmoid {
     fn parameters(&self) -> Vec<Tensor> {
         vec![]
     }
+
+    #[cfg(feature = "xla")]
+    fn trace_xla(&self, builder: &xla::XlaBuilder, input: &xla::XlaOp) -> Result<xla::XlaOp, xla::Error> {
+        crate::xla::XlaTraceable::trace(self, builder, input)
+    }
 }
 
 pub struct Tanh;
@@ -29,6 +39,11 @@ impl Module for Tanh {
     }
     fn parameters(&self) -> Vec<Tensor> {
         vec![]
+    }
+
+    #[cfg(feature = "xla")]
+    fn trace_xla(&self, builder: &xla::XlaBuilder, input: &xla::XlaOp) -> Result<xla::XlaOp, xla::Error> {
+        crate::xla::XlaTraceable::trace(self, builder, input)
     }
 }
 
@@ -41,5 +56,38 @@ impl Module for LeakyReLu {
     }
     fn parameters(&self) -> Vec<Tensor> {
         vec![]
+    }
+
+    #[cfg(feature = "xla")]
+    fn trace_xla(&self, builder: &xla::XlaBuilder, input: &xla::XlaOp) -> Result<xla::XlaOp, xla::Error> {
+        crate::xla::XlaTraceable::trace(self, builder, input)
+    }
+}
+
+impl crate::xla::XlaTraceable for ReLu {
+    #[cfg(feature = "xla")]
+    fn trace(&self, _builder: &xla::XlaBuilder, input: &xla::XlaOp) -> Result<xla::XlaOp, xla::Error> {
+        input.relu()
+    }
+}
+
+impl crate::xla::XlaTraceable for Sigmoid {
+    #[cfg(feature = "xla")]
+    fn trace(&self, _builder: &xla::XlaBuilder, input: &xla::XlaOp) -> Result<xla::XlaOp, xla::Error> {
+        crate::xla::XlaOps::sigmoid(input)
+    }
+}
+
+impl crate::xla::XlaTraceable for Tanh {
+    #[cfg(feature = "xla")]
+    fn trace(&self, _builder: &xla::XlaBuilder, input: &xla::XlaOp) -> Result<xla::XlaOp, xla::Error> {
+        input.tanh()
+    }
+}
+
+impl crate::xla::XlaTraceable for LeakyReLu {
+    #[cfg(feature = "xla")]
+    fn trace(&self, _builder: &xla::XlaBuilder, input: &xla::XlaOp) -> Result<xla::XlaOp, xla::Error> {
+        crate::xla::XlaOps::leaky_relu(input, self.alpha)
     }
 }

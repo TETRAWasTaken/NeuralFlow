@@ -20,6 +20,17 @@ pub trait Module {
     fn eval(&self) {
         self.set_training(false);
     }
+
+    fn to(&self, device: crate::tensor::Device) {
+        for p in self.parameters() {
+            p.to(device);
+        }
+    }
+
+    #[cfg(feature = "xla")]
+    fn trace_xla(&self, _builder: &xla::XlaBuilder, _input: &xla::XlaOp) -> Result<xla::XlaOp, xla::Error> {
+        Err(xla::Error::General("This module has not implemented trace_xla".into()))
+    }
 }
 
 pub struct Sequential {
@@ -75,5 +86,21 @@ impl Module for Sequential {
         for layer in &self.layers {
             layer.set_training(mode);
         }
+    }
+
+    #[cfg(feature = "xla")]
+    fn trace_xla(&self, builder: &xla::XlaBuilder, input: &xla::XlaOp) -> Result<xla::XlaOp, xla::Error> {
+        let mut curr = input.clone();
+        for layer in &self.layers {
+            curr = layer.trace_xla(builder, &curr)?;
+        }
+        Ok(curr)
+    }
+}
+
+impl crate::xla::XlaTraceable for Sequential {
+    #[cfg(feature = "xla")]
+    fn trace(&self, builder: &xla::XlaBuilder, input: &xla::XlaOp) -> Result<xla::XlaOp, xla::Error> {
+        self.trace_xla(builder, input)
     }
 }

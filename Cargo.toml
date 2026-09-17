@@ -3,6 +3,11 @@ name = "NeuralFlow"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = ["cpu"]
+cpu = []
+xla = ["dep:xla"]
+
 [dependencies]
 rand = "0.8"
 serde = { version = "1.0", features = ["derive"] }
@@ -10,6 +15,8 @@ bincode = "1.3"
 mimalloc = { version = "0.1", default-features = false }
 rayon = "1.10"
 matrixmultiply = "0.3"
+onnx-rs = "0.1.2"
+xla = { version = "0.1", optional = true }
 
 [profile.release]
 opt-level = 3

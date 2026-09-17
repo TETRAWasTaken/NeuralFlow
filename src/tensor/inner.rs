@@ -28,6 +28,9 @@ pub fn no_grad() -> NoGradGuard {
     NoGradGuard { prev }
 }
 
+use super::device::Device;
+use super::shape::Shape;
+
 #[derive(Clone)]
 pub struct Tensor(pub Rc<RefCell<TensorInner>>);
 
@@ -38,6 +41,11 @@ pub struct TensorInner {
     pub shape4d: Option<(usize, usize, usize, usize)>,
     pub backward: Option<Box<dyn Fn()>>,
     pub prev: Vec<Tensor>,
+    pub device: Device,
+    #[cfg(feature = "xla")]
+    pub xla_buffer: Option<xla::PjRtBuffer>,
+    #[cfg(feature = "xla")]
+    pub xla_grad: Option<xla::PjRtBuffer>,
 }
 
 impl Tensor {
@@ -52,6 +60,11 @@ impl Tensor {
             shape4d: None,
             backward: None,
             prev: vec![],
+            device: Device::Cpu,
+            #[cfg(feature = "xla")]
+            xla_buffer: None,
+            #[cfg(feature = "xla")]
+            xla_grad: None,
         })))
     }
 
@@ -67,6 +80,11 @@ impl Tensor {
             shape4d: Some(shape),
             backward: None,
             prev: vec![],
+            device: Device::Cpu,
+            #[cfg(feature = "xla")]
+            xla_buffer: None,
+            #[cfg(feature = "xla")]
+            xla_grad: None,
         })))
     }
 
@@ -172,5 +190,78 @@ impl Tensor {
         for g in inner.grad.iter_mut() {
             *g = 0.0;
         }
+    }
+
+    pub fn device(&self) -> Device {
+        self.0.borrow().device
+    }
+
+    pub fn unified_shape(&self) -> Shape {
+        let inner = self.0.borrow();
+        if let Some(s4) = inner.shape4d {
+            Shape::d4(s4.0, s4.1, s4.2, s4.3)
+        } else {
+            Shape::d2(inner.shape.0, inner.shape.1)
+        }
+    }
+
+    pub fn numel(&self) -> usize {
+        self.0.borrow().data.len()
+    }
+
+    pub fn to(&self, device: Device) -> Self {
+        if self.device() == device {
+            return self.clone();
+        }
+        match device {
+            Device::Cpu => self.to_cpu(),
+            Device::Gpu(_) | Device::Tpu(_) => {
+                #[cfg(feature = "xla")]
+                {
+                    let mut inner = self.0.borrow_mut();
+                    inner.device = device;
+                    drop(inner);
+                    self.clone()
+                }
+                #[cfg(not(feature = "xla"))]
+                {
+                    panic!(
+                        "Targeting device {:?} requires the `xla` feature to be enabled in NeuralFlow.",
+                        device
+                    );
+                }
+            }
+        }
+    }
+
+    pub fn to_cpu(&self) -> Self {
+        let inner = self.0.borrow();
+        if inner.device == Device::Cpu {
+            return self.clone();
+        }
+
+        #[cfg(feature = "xla")]
+        {
+            if let Some(ref buf) = inner.xla_buffer {
+                let literal = buf.to_literal_sync().expect("Failed to sync XLA buffer to CPU");
+                let data: Vec<f32> = literal.to_vec().expect("Failed to copy XLA literal to Vec<f32>");
+                drop(inner);
+                let out = if let Some(s4) = self.shape4d() {
+                    Self::new_4d(data, s4)
+                } else {
+                    Self::new(data, self.shape())
+                };
+                return out;
+            }
+        }
+
+        let mut inner = self.0.borrow_mut();
+        inner.device = Device::Cpu;
+        drop(inner);
+        self.clone()
+    }
+
+    pub fn to_device(&self, device: Device) -> Self {
+        self.to(device)
     }
 }
