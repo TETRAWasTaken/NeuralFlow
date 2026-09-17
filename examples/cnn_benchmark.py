@@ -111,7 +111,7 @@ def main():
     print(f"Loaded {len(train_dataset)} train samples, {len(test_dataset)} test samples in {time.perf_counter() - load_start:.2f}s")
 
     # Hyperparameters (matched 1:1 with NeuralFlow)
-    batch_size = 64
+    batch_size = 128
     epochs = 20
     learning_rate = 0.001
 

@@ -130,7 +130,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Hyperparameters (matched 1:1 with PyTorch)
-    let batch_size = 64;
+    let batch_size = 128;
     let epochs = 20;
     let learning_rate = 0.001;
 
