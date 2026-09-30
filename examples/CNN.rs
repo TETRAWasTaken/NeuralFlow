@@ -115,8 +115,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Dataset size configuration
     // (Set to None for full 60,000 train / 10,000 test, or use subset for fast comparative benchmarks)
-    let train_subset_size = Some(2_000);
-    let test_subset_size = Some(1_000);
+    let train_subset_size = None;
+    let test_subset_size = None;
 
     println!("\nLoading MNIST dataset...");
     let load_start = Instant::now();

@@ -101,13 +101,13 @@ def main():
     test_labels_path = "data/mnist/t10k-labels-idx1-ubyte"
 
     # Dataset size configuration (Matches NeuralFlow 1:1)
-    train_subset_size = 2000
-    test_subset_size = 1000
+    train_subset_size = None
+    test_subset_size = None
 
     print("\nLoading MNIST dataset...")
     load_start = time.perf_counter()
-    train_dataset = BinaryMNISTDataset(train_images_path, train_labels_path, train_subset_size)
-    test_dataset = BinaryMNISTDataset(test_images_path, test_labels_path, test_subset_size)
+    train_dataset = BinaryMNISTDataset(train_images_path, train_labels_path)
+    test_dataset = BinaryMNISTDataset(test_images_path, test_labels_path)
     print(f"Loaded {len(train_dataset)} train samples, {len(test_dataset)} test samples in {time.perf_counter() - load_start:.2f}s")
 
     # Hyperparameters (matched 1:1 with NeuralFlow)
