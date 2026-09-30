@@ -1,6 +1,6 @@
 [package]
 name = "rensor"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 description = "A Rust native deep learning framework specialised for CPU"
 license = "Apache-2.0"
