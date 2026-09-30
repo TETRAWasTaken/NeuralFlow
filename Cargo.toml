@@ -2,11 +2,12 @@
 name = "NeuralFlow"
 version = "0.1.0"
 edition = "2024"
-
-[features]
-default = ["cpu"]
-cpu = []
-xla = ["dep:xla"]
+description = "A Rust native deep learning framework specialised for CPU"
+license = "Apache-2.0"
+author = "Anshuman Soni"
+repository = "https://github.com/TETRAWasTaken/NeuralFlow"
+keywords = ["deep-learning", "machine-learning", "neural-networks", "cpu", "fast"]
+categories = ["development-tools::profiling", "science"]
 
 [dependencies]
 rand = "0.8"
