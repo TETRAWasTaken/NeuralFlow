@@ -1,5 +1,5 @@
 [package]
-name = "neuralflow"
+name = "NeuralFlow"
 version = "0.1.0"
 edition = "2024"
 description = "A Rust native deep learning framework specialised for CPU"
