@@ -1,4 +1,4 @@
-use NeuralFlow::prelude::*;
+use rensor::prelude::*;
 use std::collections::HashMap;
 
 pub struct DeepNet {

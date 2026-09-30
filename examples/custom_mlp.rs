@@ -1,4 +1,4 @@
-use NeuralFlow::prelude::*;
+use rensor::prelude::*;
 
 pub struct MyCustomModel {
     fc1: Linear,

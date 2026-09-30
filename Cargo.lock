@@ -3,20 +3,6 @@
 version = 4
 
 [[package]]
-name = "NeuralFlow"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "matrixmultiply",
- "mimalloc",
- "onnx-rs",
- "rand",
- "rayon",
- "serde",
- "xla",
-]
-
-[[package]]
 name = "adler2"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -659,6 +645,20 @@ name = "regex-syntax"
 version = "0.8.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
+
+[[package]]
+name = "rensor"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "matrixmultiply",
+ "mimalloc",
+ "onnx-rs",
+ "rand",
+ "rayon",
+ "serde",
+ "xla",
+]
 
 [[package]]
 name = "rustc-hash"

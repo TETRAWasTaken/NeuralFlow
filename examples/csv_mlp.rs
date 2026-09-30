@@ -1,4 +1,4 @@
-use NeuralFlow::prelude::*;
+use rensor::prelude::*;
 
 pub struct HousingModel {
     fc1: Linear,

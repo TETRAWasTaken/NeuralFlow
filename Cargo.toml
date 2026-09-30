@@ -1,10 +1,10 @@
 [package]
-name = "NeuralFlow"
+name = "rensor"
 version = "0.1.0"
 edition = "2024"
 description = "A Rust native deep learning framework specialised for CPU"
 license = "Apache-2.0"
-author = "Anshuman Soni"
+authors = ["Anshumaan Soni"]
 repository = "https://github.com/TETRAWasTaken/NeuralFlow"
 keywords = ["deep-learning", "machine-learning", "neural-networks", "cpu", "fast"]
 categories = ["development-tools::profiling", "science"]
