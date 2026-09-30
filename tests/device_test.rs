@@ -1,4 +1,4 @@
-use NeuralFlow::prelude::*;
+use rensor::prelude::*;
 
 #[test]
 fn test_device_properties_and_display() {

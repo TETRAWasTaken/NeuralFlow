@@ -1,5 +1,5 @@
-use NeuralFlow::prelude::*;
-use NeuralFlow::tensor::im2col::{col2im, im2col};
+use rensor::prelude::*;
+use rensor::tensor::im2col::{col2im, im2col};
 
 #[test]
 fn test_im2col_col2im_consistency() {

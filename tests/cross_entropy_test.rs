@@ -1,4 +1,4 @@
-use NeuralFlow::prelude::*;
+use rensor::prelude::*;
 
 #[test]
 fn test_cross_entropy_multiclass_class_indices() {

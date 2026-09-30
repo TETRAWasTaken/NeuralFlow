@@ -1,4 +1,4 @@
-use NeuralFlow::prelude::*;
+use rensor::prelude::*;
 
 #[test]
 fn test_no_grad_guard() {
