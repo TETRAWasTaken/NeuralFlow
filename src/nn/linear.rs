@@ -32,6 +32,30 @@ impl Module for Linear {
     fn trace_xla(&self, builder: &xla::XlaBuilder, input: &xla::XlaOp) -> Result<xla::XlaOp, xla::Error> {
         crate::xla::XlaTraceable::trace(self, builder, input)
     }
+
+    fn export_onnx(
+        &self,
+        ctx: &mut crate::utils::onnxexport::OnnxExportContext,
+        input_name: &str,
+    ) -> Result<String, crate::utils::onnxexport::OnnxExportError> {
+        let w_name = ctx.next_name("linear_w");
+        let w_inner = self.weights.0.borrow();
+        ctx.add_initializer(
+            w_name.clone(),
+            vec![w_inner.shape.0 as i64, w_inner.shape.1 as i64],
+            w_inner.data.clone(),
+        );
+
+        let out_name = ctx.next_name("linear_out");
+        ctx.add_node(
+            "MatMul",
+            vec![input_name.to_string(), w_name],
+            vec![out_name.clone()],
+            vec![],
+        );
+
+        Ok(out_name)
+    }
 }
 
 impl crate::xla::XlaTraceable for Linear {

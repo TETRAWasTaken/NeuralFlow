@@ -69,4 +69,12 @@ impl Module for Dropout {
         self.is_training.set(mode);
     }
 
+    fn export_onnx(
+        &self,
+        _ctx: &mut crate::utils::onnxexport::OnnxExportContext,
+        input_name: &str,
+    ) -> Result<String, crate::utils::onnxexport::OnnxExportError> {
+        // In eval / inference mode, Dropout is an identity pass-through
+        Ok(input_name.to_string())
+    }
 }

@@ -24,6 +24,7 @@ pub mod prelude {
         is_grad_enabled, no_grad, set_grad_enabled, Device, NoGradGuard, Shape, Tensor,
     };
     pub use crate::utils::checkpoint::{BestModelSaver, ModelCheckpoint};
+    pub use crate::utils::onnxexport::{export_to_onnx, OnnxExportError};
     pub use crate::utils::serialisation::TensorState;
     pub use crate::xla::XlaTraceable;
 }

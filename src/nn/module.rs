@@ -31,6 +31,16 @@ pub trait Module {
     fn trace_xla(&self, _builder: &xla::XlaBuilder, _input: &xla::XlaOp) -> Result<xla::XlaOp, xla::Error> {
         Err(xla::Error::General("This module has not implemented trace_xla".into()))
     }
+
+    fn export_onnx(
+        &self,
+        _ctx: &mut crate::utils::onnxexport::OnnxExportContext,
+        _input_name: &str,
+    ) -> Result<String, crate::utils::onnxexport::OnnxExportError> {
+        Err(crate::utils::onnxexport::OnnxExportError::UnsupportedLayer(
+            std::any::type_name::<Self>().to_string(),
+        ))
+    }
 }
 
 pub struct Sequential {
@@ -64,6 +74,14 @@ impl Sequential {
     pub fn is_training(&self) -> bool {
         self.training.get()
     }
+
+    pub fn save_onnx(
+        &self,
+        input_shape: &[usize],
+        path: impl AsRef<std::path::Path>,
+    ) -> Result<(), crate::utils::onnxexport::OnnxExportError> {
+        crate::utils::onnxexport::export_to_onnx(self, input_shape, path)
+    }
 }
 
 impl Default for Sequential {
@@ -93,6 +111,18 @@ impl Module for Sequential {
         let mut curr = input.clone();
         for layer in &self.layers {
             curr = layer.trace_xla(builder, &curr)?;
+        }
+        Ok(curr)
+    }
+
+    fn export_onnx(
+        &self,
+        ctx: &mut crate::utils::onnxexport::OnnxExportContext,
+        input_name: &str,
+    ) -> Result<String, crate::utils::onnxexport::OnnxExportError> {
+        let mut curr = input_name.to_string();
+        for layer in &self.layers {
+            curr = layer.export_onnx(ctx, &curr)?;
         }
         Ok(curr)
     }

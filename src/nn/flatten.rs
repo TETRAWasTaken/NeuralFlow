@@ -56,4 +56,22 @@ impl Module for Flatten {
     fn parameters(&self) -> Vec<Tensor> {
         vec![]
     }
+
+    fn export_onnx(
+        &self,
+        ctx: &mut crate::utils::onnxexport::OnnxExportContext,
+        input_name: &str,
+    ) -> Result<String, crate::utils::onnxexport::OnnxExportError> {
+        let out_name = ctx.next_name("flatten_out");
+        ctx.add_node(
+            "Flatten",
+            vec![input_name.to_string()],
+            vec![out_name.clone()],
+            vec![crate::utils::onnxexport::InternalAttribute::Int(
+                "axis".to_string(),
+                1,
+            )],
+        );
+        Ok(out_name)
+    }
 }

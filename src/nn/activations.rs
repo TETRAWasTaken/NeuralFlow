@@ -15,6 +15,21 @@ impl Module for ReLu {
     fn trace_xla(&self, builder: &xla::XlaBuilder, input: &xla::XlaOp) -> Result<xla::XlaOp, xla::Error> {
         crate::xla::XlaTraceable::trace(self, builder, input)
     }
+
+    fn export_onnx(
+        &self,
+        ctx: &mut crate::utils::onnxexport::OnnxExportContext,
+        input_name: &str,
+    ) -> Result<String, crate::utils::onnxexport::OnnxExportError> {
+        let out_name = ctx.next_name("relu_out");
+        ctx.add_node(
+            "Relu",
+            vec![input_name.to_string()],
+            vec![out_name.clone()],
+            vec![],
+        );
+        Ok(out_name)
+    }
 }
 
 pub struct Sigmoid;
@@ -30,6 +45,21 @@ impl Module for Sigmoid {
     fn trace_xla(&self, builder: &xla::XlaBuilder, input: &xla::XlaOp) -> Result<xla::XlaOp, xla::Error> {
         crate::xla::XlaTraceable::trace(self, builder, input)
     }
+
+    fn export_onnx(
+        &self,
+        ctx: &mut crate::utils::onnxexport::OnnxExportContext,
+        input_name: &str,
+    ) -> Result<String, crate::utils::onnxexport::OnnxExportError> {
+        let out_name = ctx.next_name("sigmoid_out");
+        ctx.add_node(
+            "Sigmoid",
+            vec![input_name.to_string()],
+            vec![out_name.clone()],
+            vec![],
+        );
+        Ok(out_name)
+    }
 }
 
 pub struct Tanh;
@@ -44,6 +74,21 @@ impl Module for Tanh {
     #[cfg(feature = "xla")]
     fn trace_xla(&self, builder: &xla::XlaBuilder, input: &xla::XlaOp) -> Result<xla::XlaOp, xla::Error> {
         crate::xla::XlaTraceable::trace(self, builder, input)
+    }
+
+    fn export_onnx(
+        &self,
+        ctx: &mut crate::utils::onnxexport::OnnxExportContext,
+        input_name: &str,
+    ) -> Result<String, crate::utils::onnxexport::OnnxExportError> {
+        let out_name = ctx.next_name("tanh_out");
+        ctx.add_node(
+            "Tanh",
+            vec![input_name.to_string()],
+            vec![out_name.clone()],
+            vec![],
+        );
+        Ok(out_name)
     }
 }
 
@@ -61,6 +106,24 @@ impl Module for LeakyReLu {
     #[cfg(feature = "xla")]
     fn trace_xla(&self, builder: &xla::XlaBuilder, input: &xla::XlaOp) -> Result<xla::XlaOp, xla::Error> {
         crate::xla::XlaTraceable::trace(self, builder, input)
+    }
+
+    fn export_onnx(
+        &self,
+        ctx: &mut crate::utils::onnxexport::OnnxExportContext,
+        input_name: &str,
+    ) -> Result<String, crate::utils::onnxexport::OnnxExportError> {
+        let out_name = ctx.next_name("leaky_relu_out");
+        ctx.add_node(
+            "LeakyRelu",
+            vec![input_name.to_string()],
+            vec![out_name.clone()],
+            vec![crate::utils::onnxexport::InternalAttribute::Float(
+                "alpha".to_string(),
+                self.alpha,
+            )],
+        );
+        Ok(out_name)
     }
 }
 

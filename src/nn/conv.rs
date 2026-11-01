@@ -360,4 +360,58 @@ impl Module for Conv2d {
         }
         params
     }
+
+    fn export_onnx(
+        &self,
+        ctx: &mut crate::utils::onnxexport::OnnxExportContext,
+        input_name: &str,
+    ) -> Result<String, crate::utils::onnxexport::OnnxExportError> {
+        let w_name = ctx.next_name("conv_w");
+        let w_inner = self.weights.0.borrow();
+        let (k_h, k_w) = self.kernel_size;
+        ctx.add_initializer(
+            w_name.clone(),
+            vec![self.out_channels as i64, self.in_channels as i64, k_h as i64, k_w as i64],
+            w_inner.data.clone(),
+        );
+
+        let mut inputs = vec![input_name.to_string(), w_name];
+
+        if let Some(ref b) = self.bias {
+            let b_name = ctx.next_name("conv_b");
+            let b_inner = b.0.borrow();
+            ctx.add_initializer(
+                b_name.clone(),
+                vec![self.out_channels as i64],
+                b_inner.data.clone(),
+            );
+            inputs.push(b_name);
+        }
+
+        let out_name = ctx.next_name("conv_out");
+        let (pad_h, pad_w) = self.padding;
+        let (stride_h, stride_w) = self.stride;
+
+        ctx.add_node(
+            "Conv",
+            inputs,
+            vec![out_name.clone()],
+            vec![
+                crate::utils::onnxexport::InternalAttribute::Ints(
+                    "kernel_shape".to_string(),
+                    vec![k_h as i64, k_w as i64],
+                ),
+                crate::utils::onnxexport::InternalAttribute::Ints(
+                    "strides".to_string(),
+                    vec![stride_h as i64, stride_w as i64],
+                ),
+                crate::utils::onnxexport::InternalAttribute::Ints(
+                    "pads".to_string(),
+                    vec![pad_h as i64, pad_w as i64, pad_h as i64, pad_w as i64],
+                ),
+            ],
+        );
+
+        Ok(out_name)
+    }
 }

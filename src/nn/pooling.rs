@@ -214,6 +214,30 @@ impl Module for MaxPool2d {
     fn parameters(&self) -> Vec<Tensor> {
         vec![]
     }
+
+    fn export_onnx(
+        &self,
+        ctx: &mut crate::utils::onnxexport::OnnxExportContext,
+        input_name: &str,
+    ) -> Result<String, crate::utils::onnxexport::OnnxExportError> {
+        let out_name = ctx.next_name("maxpool_out");
+        ctx.add_node(
+            "MaxPool",
+            vec![input_name.to_string()],
+            vec![out_name.clone()],
+            vec![
+                crate::utils::onnxexport::InternalAttribute::Ints(
+                    "kernel_shape".to_string(),
+                    vec![self.kernel_size.0 as i64, self.kernel_size.1 as i64],
+                ),
+                crate::utils::onnxexport::InternalAttribute::Ints(
+                    "strides".to_string(),
+                    vec![self.stride.0 as i64, self.stride.1 as i64],
+                ),
+            ],
+        );
+        Ok(out_name)
+    }
 }
 
 pub struct AvgPool2d {
@@ -379,5 +403,29 @@ impl Module for AvgPool2d {
 
     fn parameters(&self) -> Vec<Tensor> {
         vec![]
+    }
+
+    fn export_onnx(
+        &self,
+        ctx: &mut crate::utils::onnxexport::OnnxExportContext,
+        input_name: &str,
+    ) -> Result<String, crate::utils::onnxexport::OnnxExportError> {
+        let out_name = ctx.next_name("avgpool_out");
+        ctx.add_node(
+            "AveragePool",
+            vec![input_name.to_string()],
+            vec![out_name.clone()],
+            vec![
+                crate::utils::onnxexport::InternalAttribute::Ints(
+                    "kernel_shape".to_string(),
+                    vec![self.kernel_size.0 as i64, self.kernel_size.1 as i64],
+                ),
+                crate::utils::onnxexport::InternalAttribute::Ints(
+                    "strides".to_string(),
+                    vec![self.stride.0 as i64, self.stride.1 as i64],
+                ),
+            ],
+        );
+        Ok(out_name)
     }
 }
