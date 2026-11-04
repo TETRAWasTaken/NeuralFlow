@@ -234,6 +234,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
+    export_to_onnx(&model, &[1, 1, 28, 28], "./examples/CNN.onnx").expect("Failed to export the model in ONNX format");
+
     println!("{:-<75}", "");
     println!(
         "\nBenchmark completed in {:.2}s",
