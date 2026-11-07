@@ -235,7 +235,7 @@ pub fn export_to_onnx(
         .collect();
 
     let graph = Graph {
-        name: "rensor_graph",
+        name: "neuralflow_graph",
         node: nodes,
         initializer: initializers,
         input: vec![input_vi],
@@ -249,14 +249,14 @@ pub fn export_to_onnx(
             domain: "",
             version: 19,
         }],
-        producer_name: "rensor",
+        producer_name: "NeuralFlow",
         producer_version: "0.1.0",
         graph: Some(graph),
         ..Default::default()
     };
 
     let encoded = onnx_rs::encode(&model);
-    fs::write(path, encoded).unwrap();
+    fs::write(path, encoded)?;
 
     Ok(())
 }

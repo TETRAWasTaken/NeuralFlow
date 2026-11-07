@@ -1,3 +1,4 @@
+// macOS Accelerate framework
 #[cfg(target_os = "macos")]
 #[link(name = "Accelerate", kind = "framework")]
 unsafe extern "C" {
@@ -19,11 +20,59 @@ unsafe extern "C" {
     );
 }
 
-#[cfg(target_os = "macos")]
+// Intel oneMKL (optional feature `intel-mkl` on non-macOS)
+#[cfg(all(not(target_os = "macos"), feature = "intel-mkl"))]
+extern crate intel_mkl_src;
+
+#[cfg(all(not(target_os = "macos"), feature = "intel-mkl"))]
+unsafe extern "C" {
+    pub fn cblas_sgemm(
+        layout: i32,
+        trans_a: i32,
+        trans_b: i32,
+        m: i32,
+        n: i32,
+        k: i32,
+        alpha: f32,
+        a: *const f32,
+        lda: i32,
+        b: *const f32,
+        ldb: i32,
+        beta: f32,
+        c: *mut f32,
+        ldc: i32,
+    );
+}
+
+// AMD AOCL-BLAS (optional feature `aocl` on non-macOS)
+#[cfg(all(not(target_os = "macos"), not(feature = "intel-mkl"), feature = "aocl"))]
+extern crate aocl_blas;
+
+#[cfg(all(not(target_os = "macos"), not(feature = "intel-mkl"), feature = "aocl"))]
+unsafe extern "C" {
+    pub fn cblas_sgemm(
+        layout: i32,
+        trans_a: i32,
+        trans_b: i32,
+        m: i32,
+        n: i32,
+        k: i32,
+        alpha: f32,
+        a: *const f32,
+        lda: i32,
+        b: *const f32,
+        ldb: i32,
+        beta: f32,
+        c: *mut f32,
+        ldc: i32,
+    );
+}
+
+#[cfg(any(target_os = "macos", feature = "intel-mkl", feature = "aocl"))]
 pub const CBLAS_ROW_MAJOR: i32 = 101;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", feature = "intel-mkl", feature = "aocl"))]
 pub const CBLAS_NO_TRANS: i32 = 111;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", feature = "intel-mkl", feature = "aocl"))]
 pub const CBLAS_TRANS: i32 = 112;
 
 /// General matrix multiplication: C = alpha * op(A) * op(B) + beta * C
@@ -49,7 +98,8 @@ pub unsafe fn gemm(
         return;
     }
 
-    #[cfg(target_os = "macos")]
+    // 1. Hardware-accelerated vendor BLAS (macOS Accelerate, Intel oneMKL, or AMD AOCL)
+    #[cfg(any(target_os = "macos", feature = "intel-mkl", feature = "aocl"))]
     {
         let ta = if trans_a { CBLAS_TRANS } else { CBLAS_NO_TRANS };
         let tb = if trans_b { CBLAS_TRANS } else { CBLAS_NO_TRANS };
@@ -77,7 +127,9 @@ pub unsafe fn gemm(
         }
     }
 
-    #[cfg(not(target_os = "macos"))]
+    // 2. Default portable, high-performance pure-Rust BLIS fallback (Windows, Linux, x86_64, aarch64)
+    // Uses runtime CPU detection for AVX2/FMA/SSE2 (Intel & AMD) and NEON (ARM).
+    #[cfg(not(any(target_os = "macos", feature = "intel-mkl", feature = "aocl")))]
     {
         let (rsa, csa) = if trans_a { (1, m as isize) } else { (k as isize, 1) };
         let (rsb, csb) = if trans_b { (1, k as isize) } else { (n as isize, 1) };
@@ -101,5 +153,25 @@ pub unsafe fn gemm(
                 csc,
             );
         }
+    }
+}
+
+/// Returns the name of the active BLAS backend compiled into this binary.
+pub fn active_blas_backend() -> &'static str {
+    #[cfg(target_os = "macos")]
+    {
+        "Apple Accelerate (cblas_sgemm)"
+    }
+    #[cfg(all(not(target_os = "macos"), feature = "intel-mkl"))]
+    {
+        "Intel oneMKL (cblas_sgemm)"
+    }
+    #[cfg(all(not(target_os = "macos"), not(feature = "intel-mkl"), feature = "aocl"))]
+    {
+        "AMD AOCL-BLAS (cblas_sgemm)"
+    }
+    #[cfg(not(any(target_os = "macos", feature = "intel-mkl", feature = "aocl")))]
+    {
+        "matrixmultiply (AVX2/FMA/NEON pure-Rust SIMD)"
     }
 }
