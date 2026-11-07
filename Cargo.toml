@@ -6,7 +6,7 @@ description = "A Rust native deep learning framework specialised for CPU"
 license = "Apache-2.0"
 authors = ["Anshumaan Soni"]
 repository = "https://github.com/TETRAWasTaken/NeuralFlow"
-keywords = ["deep-learning", "machine-learning", "neural-networks", "cpu", "fast", "BLAS"]
+keywords = ["deep-learning", "machine-learning", "neural-networks", "cpu", "BLAS"]
 categories = ["development-tools::profiling", "science"]
 
 [dependencies]
