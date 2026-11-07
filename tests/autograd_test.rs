@@ -119,4 +119,10 @@ fn test_gemm_rectangular_correctness() {
     assert!(b.0.borrow().grad.iter().all(|&g| !g.is_nan()));
 }
 
+#[test]
+fn test_active_blas_backend() {
+    let backend = rensor::tensor::blas::active_blas_backend();
+    assert!(!backend.is_empty());
+}
+
 

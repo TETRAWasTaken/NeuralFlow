@@ -12,7 +12,7 @@
 ## Key Features
 
 - **Blazing Fast CPU Engine**:
-  - Hardware-accelerated matrix multiplication using Apple's **Accelerate framework** (`cblas_sgemm`) on macOS and **`matrixmultiply`** with AVX/FMA/NEON SIMD on Linux & Windows.
+  - Hardware-accelerated matrix multiplication across platforms: Apple **Accelerate** on macOS, pure-Rust **`matrixmultiply`** (AVX2/FMA/NEON) by default on Linux & Windows, and optional high-performance vendor backends (**Intel oneMKL**, **OpenBLAS**, **AMD AOCL**).
   - Efficient GEMM-based 2D convolutions using optimized parallel `im2col` and `col2im` transformations.
   - Contiguous buffer layout with minimal dynamic reallocation and **`mimalloc`** as the global allocator.
 - **Dynamic Autograd Tape**:
@@ -305,13 +305,33 @@ graph TD
 
     subgraph Backend ["Optimized Computation Engine"]
         ACC["macOS: Apple Accelerate (cblas_sgemm)"]
-        MMX["Linux / Windows: matrixmultiply (SIMD)"]
+        MMX["Linux / Windows (Default): matrixmultiply (AVX2/FMA/NEON)"]
+        VBLAS["Linux / Windows (Optional): Intel oneMKL / OpenBLAS / AMD AOCL"]
         I2C["im2col / col2im Parallel Convolutions"]
         XLA["Optional: OpenXLA Tracing Backend"]
     end
 
     Frontend --> Core
     Core --> Backend
+```
+
+---
+
+## BLAS Backends & Cross-Platform Acceleration
+
+Rensor provides a tiered, modular linear algebra backend:
+
+| Backend | Platforms | Feature Flag | Requirements |
+| :--- | :--- | :--- | :--- |
+| **Apple Accelerate** | macOS (ARM & Intel) | Built-in (automatic) | macOS System Framework |
+| **`matrixmultiply` (Default)** | Windows & Linux | Default (no flags) | None (Pure-Rust with AVX2/FMA/NEON SIMD) |
+| **Intel oneMKL** | Windows & Linux | `--features intel-mkl` (or `system-mkl`) | Intel oneMKL toolkit or `mkl_rt` |
+| **OpenBLAS** | Windows & Linux | `--features openblas` (or `system-openblas`) | OpenBLAS package or DLL |
+| **AMD AOCL-BLAS** | Windows & Linux | `--features aocl` | AMD AOCL installation |
+
+To query the active backend in code at runtime:
+```rust
+println!("Active BLAS: {}", rensor::tensor::blas::active_blas_backend());
 ```
 
 ---

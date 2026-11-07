@@ -20,11 +20,15 @@ onnx-rs = "0.1.2"
 xla = { version = "0.1", optional = true }
 aocl-blas = { version = "0.1.0", optional = true }
 intel-mkl-src = { version = "0.8", optional = true }
+openblas-src = { version = "0.10", default-features = false, features = ["cblas"], optional = true }
 
 [features]
 default = []
 intel-mkl = ["dep:intel-mkl-src"]
 aocl = ["dep:aocl-blas"]
+openblas = ["dep:openblas-src"]
+system-openblas = []
+system-mkl = []
 xla = ["dep:xla"]
 
 [profile.release]
