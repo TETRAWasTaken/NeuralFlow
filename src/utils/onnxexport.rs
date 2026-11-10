@@ -101,7 +101,7 @@ impl OnnxExportContext {
     }
 }
 
-/// Exports a NeuralFlow module/sequential graph into ONNX format.
+/// Exports a Rensor module/sequential graph into ONNX format.
 pub fn export_to_onnx(
     model: &crate::nn::Sequential,
     input_shape: &[usize],
@@ -152,17 +152,20 @@ pub fn export_to_onnx(
         ..Default::default()
     };
 
-    // Build ONNX output ValueInfo
+    // Build ONNX output ValueInfo with dynamic batch and inferred output feature dimension
     let output_vi = ValueInfo {
         name: &graph_output_name,
         r#type: Some(TypeProto {
             value: Some(TypeValue::Tensor(TensorTypeProto {
                 elem_type: DataType::Float,
                 shape: Some(TensorShape {
-                    dim: vec![TensorShapeDimension {
-                        value: Dimension::Param("batch"),
-                        ..Default::default()
-                    }],
+                    dim: vec![
+                        TensorShapeDimension {
+                            value: Dimension::Param("batch"),
+                            ..Default::default()
+                        },
+                        TensorShapeDimension::default(),
+                    ],
                 }),
             })),
             ..Default::default()
@@ -235,7 +238,7 @@ pub fn export_to_onnx(
         .collect();
 
     let graph = Graph {
-        name: "neuralflow_graph",
+        name: "rensor_graph",
         node: nodes,
         initializer: initializers,
         input: vec![input_vi],
@@ -249,8 +252,8 @@ pub fn export_to_onnx(
             domain: "",
             version: 19,
         }],
-        producer_name: "NeuralFlow",
-        producer_version: "0.1.0",
+        producer_name: "Rensor",
+        producer_version: "1.1.0",
         graph: Some(graph),
         ..Default::default()
     };

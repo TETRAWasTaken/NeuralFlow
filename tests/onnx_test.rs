@@ -27,11 +27,11 @@ fn test_export_mlp_to_onnx_and_parse_back() {
 
     let parsed_model = onnx_rs::parse(&bytes).expect("Failed to parse ONNX protobuf with onnx-rs");
 
-    assert_eq!(parsed_model.producer_name, "NeuralFlow");
+    assert_eq!(parsed_model.producer_name, "Rensor");
     assert_eq!(parsed_model.ir_version, 9);
 
     let graph = parsed_model.graph.as_ref().expect("Model graph missing");
-    assert_eq!(graph.name, "neuralflow_graph");
+    assert_eq!(graph.name, "rensor_graph");
 
     // Verify graph inputs and outputs
     assert_eq!(graph.input.len(), 1);

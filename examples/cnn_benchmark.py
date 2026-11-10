@@ -35,7 +35,7 @@ class BinaryMNISTDataset(Dataset):
 
 
 # ==============================================================================
-# 2. Benchmark CNN Architecture (1:1 with NeuralFlow build_cnn_model)
+# 2. Benchmark CNN Architecture (1:1 with Rensor build_cnn_model)
 # ==============================================================================
 class BenchmarkCNN(nn.Module):
     def __init__(self, num_classes: int = 10):
@@ -52,7 +52,7 @@ class BenchmarkCNN(nn.Module):
 
         # Flatten & Classification Head
         self.flatten = nn.Flatten()
-        # In NeuralFlow, Linear has no bias
+        # In Rensor, Linear has no bias
         self.fc1 = nn.Linear(32 * 7 * 7, 128, bias=False)
         self.relu3 = nn.ReLU()
         self.drop = nn.Dropout(p=0.2)
@@ -61,7 +61,7 @@ class BenchmarkCNN(nn.Module):
         self._init_weights()
 
     def _init_weights(self):
-        # Match NeuralFlow's Kaiming Normal (fan_in, nonlinearity='relu')
+        # Match Rensor's Kaiming Normal (fan_in, nonlinearity='relu')
         for conv in [self.conv1, self.conv2]:
             nn.init.kaiming_normal_(conv.weight, mode='fan_in', nonlinearity='relu')
             if conv.bias is not None:
@@ -100,7 +100,7 @@ def main():
     test_images_path = "data/mnist/t10k-images-idx3-ubyte"
     test_labels_path = "data/mnist/t10k-labels-idx1-ubyte"
 
-    # Dataset size configuration (Matches NeuralFlow 1:1)
+    # Dataset size configuration (Matches Rensor 1:1)
     train_subset_size = None
     test_subset_size = None
 
@@ -110,7 +110,7 @@ def main():
     test_dataset = BinaryMNISTDataset(test_images_path, test_labels_path)
     print(f"Loaded {len(train_dataset)} train samples, {len(test_dataset)} test samples in {time.perf_counter() - load_start:.2f}s")
 
-    # Hyperparameters (matched 1:1 with NeuralFlow)
+    # Hyperparameters (matched 1:1 with Rensor)
     batch_size = 128
     epochs = 20
     learning_rate = 0.001

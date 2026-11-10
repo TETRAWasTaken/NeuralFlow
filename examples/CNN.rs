@@ -104,7 +104,7 @@ fn count_parameters(model: &Sequential) -> usize {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("============================================================");
-    println!("  NeuralFlow: MNIST CNN Training & Benchmark");
+    println!("  Rensor: MNIST CNN Training & Benchmark");
     println!("============================================================");
 
     // Paths to MNIST binary files

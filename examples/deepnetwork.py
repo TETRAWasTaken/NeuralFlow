@@ -13,7 +13,7 @@ from torch.utils.data import Dataset, DataLoader
 class DeepNet(nn.Module):
     def __init__(self, in_features: int = 9, hidden_dim: int = 64, out_features: int = 1):
         super().__init__()
-        # In NeuralFlow, Linear has no bias and weights are initialized uniformly in [-1, 1]
+        # In Rensor, Linear has no bias and weights are initialized uniformly in [-1, 1]
         self.fc1 = nn.Linear(in_features, hidden_dim, bias=False)
         self.ln1 = nn.LayerNorm(hidden_dim, eps=1e-5)
         self.drop1 = nn.Dropout(p=0.2)
@@ -32,7 +32,7 @@ class DeepNet(nn.Module):
         self._init_weights()
 
     def _init_weights(self):
-        # Match Tensor::random in NeuralFlow: uniform(-1.0, 1.0)
+        # Match Tensor::random in Rensor: uniform(-1.0, 1.0)
         for m in [self.fc1, self.fc2, self.fc3, self.fc4]:
             nn.init.uniform_(m.weight, -1.0, 1.0)
 
@@ -67,7 +67,7 @@ class StandardScaler:
         self.is_fitted = False
 
     def fit(self, data: np.ndarray):
-        # Population mean and std (matching NeuralFlow's variance formula)
+        # Population mean and std (matching Rensor's variance formula)
         self.mean = np.mean(data, axis=0)
         variance = np.mean(data ** 2, axis=0) - (self.mean ** 2)
         variance = np.maximum(variance, 0.0)

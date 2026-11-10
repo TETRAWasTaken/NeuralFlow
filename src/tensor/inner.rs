@@ -226,7 +226,7 @@ impl Tensor {
                 #[cfg(not(feature = "xla"))]
                 {
                     panic!(
-                        "Targeting device {:?} requires the `xla` feature to be enabled in NeuralFlow.",
+                        "Targeting device {:?} requires the `xla` feature to be enabled in Rensor.",
                         device
                     );
                 }
